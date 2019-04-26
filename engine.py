@@ -2,9 +2,11 @@ import tdl
 from game_states import GameStates
 from input_functions import handle_keys
 from map_functions import GameMap, create_map, Button
-from entity_classes import Monster, Player, get_blocking_entities_at_location
+from entity_classes import Monster, Player, get_blocking_entities_at_location, stats
 from render_functions import render_all
-from message_functions import MessageLog, Message
+from message_functions import MessageLog
+from death_functions import kill_player, kill_monster
+from config import colours
 
 
 def main():
@@ -20,7 +22,10 @@ def main():
     screen_height = view_port_height + 24
 
     # Message log (bottom panel)
-    message_log_width, message_log_height = (screen_width - 4, 10)
+    message_log_width, message_log_height = (screen_width - 4, 8)
+
+    # HUD (top panel)
+    hud_width, hud_height = (screen_width - 4, 10)
 
     # Dict to contain screen architecture
     screen_layout = dict()
@@ -28,6 +33,7 @@ def main():
     screen_layout["map"] = (map_width, map_height)
     screen_layout["view_port"] = (view_port_width, view_port_height)
     screen_layout["message_log"] = (message_log_width, message_log_height)
+    screen_layout["hud"] = (hud_width, hud_height)
 
     # # INITIALISE TDL CONSOLE ENGINE
     # General - set the font to be used, and fps limit.
@@ -39,9 +45,10 @@ def main():
     map_console = tdl.Console(map_width, map_height)
     message_console = tdl.Console(message_log_width, message_log_height)
     view_port_console = tdl.Console(view_port_width, view_port_height)
+    hud_console = tdl.Console(hud_width, hud_height)
 
     # Holding list to be unpacked in render function.
-    all_consoles = [root_console, view_port_console, map_console, message_console]
+    all_consoles = [root_console, view_port_console, map_console, message_console, hud_console]
 
     # Set up HUD panels
     message_log = MessageLog(0, 0, width=message_log_width, height=message_log_height)
@@ -57,7 +64,8 @@ def main():
     game_state = GameStates.PLAYER_TURN
 
     # Player & entities - set up player stats, then put in holding list for all game entities.
-    player = Player(5, 5, "Player", "@", (255, 255, 255))
+    player_stats = stats(50, 2, 1)
+    player = Player(5, 5, "Bolly Angerfist", "@", (255, 255, 255), player_stats)
     entities = [player]
 
     # Map - create the map object, and then run the function to generate game world.
@@ -66,6 +74,8 @@ def main():
 
     # # MAIN GAME LOOP
     while not tdl.event.is_window_closed():  # Endless loop while program is still running
+
+        '''RENDERING START'''
         # Recompute the FOV around the player only when triggered.
         if fov_recompute:
             game_map.compute_fov(player.x, player.y,
@@ -74,7 +84,9 @@ def main():
         # Main rendering function - perform every frame.
         render_all(game_map, all_consoles, player, entities, fov_recompute, screen_layout, message_log)
         fov_recompute = False
+        '''RENDERING END'''
 
+        '''GET INPUT START'''
         # Check for keyboard/mouse events.
         for event in tdl.event.get():
             if event.type == 'KEYUP':
@@ -94,11 +106,18 @@ def main():
         move = action.get('move')
         exit_game = action.get('exit_game')
         fullscreen = action.get('fullscreen')
-        message = action.get('message')
+        '''GET INPUT END'''
 
-        if message:
-            message_log.add_message(Message("Message message message message message message"))
-            fov_recompute = True
+        '''MENU HANDLING START'''
+        if exit_game:
+            return True  # Break out of the loop and close script.
+
+        if fullscreen:
+            tdl.set_fullscreen(not tdl.get_fullscreen())
+        '''MENU HANDLING END'''
+
+        '''PLAYER TURN START'''
+        player_turn_results = []
 
         # If it's a movement event and it's the player's turn, move the player.
         if move and game_state == GameStates.PLAYER_TURN:
@@ -112,39 +131,76 @@ def main():
 
                 if target:
                     if isinstance(target, Monster):
-                        pass
-                        # Combat here
+                        attack_results = player.attack(target)
+                        player_turn_results.extend(attack_results)
+                        fov_recompute = True
 
                 else:
                     player.move(dx, dy)
                     fov_recompute = True
 
-            # TODO: Doc
+            # If the tile is a door and not open, and not a door with a button - open it when touched by player.
             elif game_map.is_door[destination_x, destination_y] and not game_map.door[destination_x][destination_y].is_open:
                 if not game_map.door[destination_x][destination_y].button:
                     game_map.open_door(destination_x, destination_y)
                     fov_recompute = True
 
+                # If the tile is a Button, activate it.
                 if isinstance(game_map.door[destination_x][destination_y], Button):
                     game_map.door[destination_x][destination_y].open_door(game_map)
                     fov_recompute = True
 
             game_state = GameStates.ENEMY_TURN
 
-        if exit_game:
-            return True  # Break out of the loop and close script.
+        for result in player_turn_results:
+            message = result.get("message")
+            dead_entity = result.get("dead")
 
-        if fullscreen:
-            tdl.set_fullscreen(not tdl.get_fullscreen())
+            if message:
+                message_log.add_message(message)
 
-        # TODO: doc
+            if dead_entity:
+                if dead_entity == player:
+                    message, game_state = kill_player(dead_entity)
+                else:
+                    message = kill_monster(dead_entity)
+
+                message_log.add_message(message)
+        '''PLAYER TURN END'''
+
+        '''ENEMY TURN START'''
+        # If this is the Enemy's turn, iterate through the entities list and let the Monster objects take an action.
         if game_state == GameStates.ENEMY_TURN:
+
             for entity in entities:
-                if isinstance(entity, Monster):
-                    entity.take_turn(player, game_map, entities)
+                if isinstance(entity, Monster) and not entity.dead:
+                    enemy_turn_results = entity.take_turn(player, game_map, entities)
+                    fov_recompute = True
+
+                    for result in enemy_turn_results:
+                        message = result.get("message")
+                        dead_entity = result.get("dead")
+
+                        if message:
+                            message_log.add_message(message)
+
+                        if dead_entity:
+                            if dead_entity == player:
+                                message, game_state = kill_player(dead_entity)
+                            else:
+                                message = kill_monster(dead_entity)
+
+                            message_log.add_message(message)
+
+                        if game_state == GameStates.PLAYER_DEAD:
+                            break
+
+                    if game_state == GameStates.PLAYER_DEAD:
+                        break
 
             else:
                 game_state = GameStates.PLAYER_TURN
+            '''ENEMY TURN START'''
 
 
 if __name__ == "__main__":

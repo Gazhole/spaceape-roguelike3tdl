@@ -21,7 +21,4 @@ def handle_keys(user_input):
     if user_input.key == 'ESCAPE':
         return {'exit_game': True}
 
-    elif user_input.key == "ENTER":
-        return {"message": True}
-
     return {}

@@ -1,0 +1,17 @@
+
+# Dict to contain colour scheme
+colours = dict()
+colours["white"] = (255, 255, 255)
+colours["black"] = (0, 0, 0)
+colours["green"] = (0, 128, 0)
+colours["light_green"] = (114, 255, 114)
+colours["dark_green"] = (0, 50, 0)
+colours["yellow"] = (220, 180, 0)
+colours["dark_yellow"] = (102, 102, 0)
+colours["light_yellow"] = (255, 255, 0)
+colours["red"] = (255, 0, 0)
+colours["light_red"] = (255, 114, 114)
+colours["dark_red"] = (127, 0, 0)
+colours["blue"] = (0, 0, 255)
+colours["light_blue"] = (114, 114, 255)
+colours["dark_blue"] = (0, 0, 127)

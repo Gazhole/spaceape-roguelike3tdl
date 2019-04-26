@@ -3,6 +3,7 @@ import numpy as np
 import random
 from entity_classes import Monster
 from render_functions import get_render_char
+from entity_classes import stats
 
 
 class GameMap(Map):
@@ -309,10 +310,11 @@ def create_map(game_map, player, entities):
     game_map.set_door(35, 30)
     game_map.set_door(9, 12, w=2, h=8, secret=True)
     game_map.set_door(31, 9, w=8, h=2, secret=True)
-    button1 = game_map.set_door(26, 41, w=18, h=2, secret=True, button=(30, 35))
+    game_map.set_door(26, 41, w=18, h=2, secret=True, button=(30, 35))
 
     for m in range(random.randint(1, 8)):
-        monster = Monster(0, 0, "Monster", "M", (255, 100, 100))
+        monster_stats = stats(4, 2, 1)
+        monster = Monster(0, 0, "Monster", "M", (255, 100, 100), monster_stats)
         entities.append(monster)
         viable_coords = get_viable_coordinates(game_map)
         place_entity(viable_coords, game_map, monster)
