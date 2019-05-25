@@ -1,7 +1,7 @@
 import tdl
 from game_states import GameStates
 from input_functions import handle_keys
-from map_functions import GameMap, create_map, Button
+from map_functions import GameMap, make_map, create_set_map, Button
 from entity_classes import Monster, Player, get_blocking_entities_at_location, stats
 from render_functions import render_all
 from message_functions import MessageLog
@@ -12,7 +12,7 @@ from config import colours
 def main():
     # # SET GAME CONSTANTS
     # Map - any width and height OK, view port will move with player.
-    map_width, map_height = (100, 100)
+    map_width, map_height = (150, 150)
 
     # View Port - the area of the screen displaying game world.
     view_port_width, view_port_height = (30, 30)
@@ -62,6 +62,7 @@ def main():
     # # GAME WORLD SETUP
     # General - set the initial game state.
     game_state = GameStates.PLAYER_TURN
+    mouse_coordinates = (0, 0)
 
     # Player & entities - set up player stats, then put in holding list for all game entities.
     player_stats = stats(50, 2, 1)
@@ -70,7 +71,8 @@ def main():
 
     # Map - create the map object, and then run the function to generate game world.
     game_map = GameMap(map_width, map_height)
-    create_map(game_map, player, entities)
+    make_map(game_map, player, num_rooms=20, min_size=5, max_size=15, map_border=3, intersect_chance=10)
+    # create_set_map(game_map, player, entities)
 
     # # MAIN GAME LOOP
     while not tdl.event.is_window_closed():  # Endless loop while program is still running
@@ -82,7 +84,7 @@ def main():
                                  fov=fov_algorithm, radius=fov_radius, light_walls=fov_light_walls, sphere=True)
 
         # Main rendering function - perform every frame.
-        render_all(game_map, all_consoles, player, entities, fov_recompute, screen_layout, message_log)
+        render_all(game_map, all_consoles, player, entities, fov_recompute, screen_layout, message_log, mouse_coordinates)
         fov_recompute = False
         '''RENDERING END'''
 
@@ -92,6 +94,9 @@ def main():
             if event.type == 'KEYUP':
                 user_input = event
                 break
+
+            elif event.type == "MOUSEMOTION":
+                mouse_coordinates = event.cell
 
         else:
             user_input = None

@@ -2,6 +2,7 @@ from enum import Enum
 import tdl
 import numpy as np
 from config import colours
+from game_states import GameStates
 
 
 class RenderOrder(Enum):
@@ -13,7 +14,7 @@ class RenderOrder(Enum):
     ACTOR = 3
 
 
-def render_all(game_map, all_consoles, player, entities, fov_recompute, screen_layout, message_log):
+def render_all(game_map, all_consoles, player, entities, fov_recompute, screen_layout, message_log, mouse_coordinates):
     """
     Draw all game elements on screen. This function is called from the engine every frame.
     This actually just calls the individual functions to draw the map, game entities, and other HUD elements.
@@ -363,7 +364,7 @@ def screen_from_map(map_x, map_y, view_port_x1, view_port_y1):
 # TODO: as above
 def map_from_screen(screen_x, screen_y, view_port_x1, view_port_y1):
     map_x = screen_x + (view_port_x1 - 2)
-    map_y = screen_y + (view_port_y1 - 2)
+    map_y = screen_y + (view_port_y1 - 10)
 
     return map_x, map_y
 

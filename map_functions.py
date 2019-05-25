@@ -6,6 +6,13 @@ from render_functions import get_render_char
 from entity_classes import stats
 
 
+# Set up predictable random number for testing.
+PRNG = random.Random()
+seed = random.randint(1, 1000000)
+PRNG.seed(seed)
+print(seed)
+
+
 class GameMap(Map):
     """
     GameMap object which stores information about the game world the player has to navigate.
@@ -31,6 +38,7 @@ class GameMap(Map):
         super().__init__(map_width, map_height)
         self.width = map_width
         self.height = map_height
+        self.rooms = []
 
         self.explored = np.array([[False for y in range(map_height)] for x in range(map_width)])
         self.viable_coords = np.array([[False for y in range(map_height)] for x in range(map_width)])
@@ -240,10 +248,7 @@ class Rect:
     def carve(self, game_map):
         for y in range(self.y1, self.y2):
             for x in range(self.x1, self.x2):
-
-                game_map.transparent[x, y] = True
-                game_map.walkable[x, y] = True
-                game_map.viable_coords[x, y] = True
+                carve_function(game_map, x, y)
 
 
 def get_viable_coordinates(game_map):
@@ -273,7 +278,7 @@ def place_entity(viable_coords, game_map, entity):
     game_map.viable_coords[place_x, place_y] = False
 
 
-def create_map(game_map, player, entities):
+def create_set_map(game_map, player, entities):
     """
     Holding function for the map generation routines later on.
     At the moment creates a few simple rects and carves them.
@@ -281,43 +286,221 @@ def create_map(game_map, player, entities):
     :param game_map: The game_map object.
     :param player: Player entity object
     """
-    room1 = Rect(11, 11, 10, 10)
 
-    v_corridoor_1_2 = Rect(15, 17, 3, 20)
-    h_corridoor_1_2 = Rect(15, 36, 10, 3)
+    room1 = Rect(50, 50, 10, 10)
+    room1.carve(game_map)
+    player.x, player.y = find_room_center(room1)
 
-    room2 = Rect(25, 31, 20, 10)
-    room3 = Rect(30, 11, 10, 10)
+    room2 = Rect(50, 25, 10, 10)
+    room2.carve(game_map)
+    create_corridoor(game_map, room1, room2)
 
-    h_corridoor_1_3 = Rect(21, 16, 10, 2)
-    v_corridoor_2_3 = Rect(35, 21, 1, 10)
+    room3 = Rect(50, 75, 10, 10)
+    room3.carve(game_map)
+    create_corridoor(game_map, room1, room3)
 
-    secret_room_1 = Rect(26, 41, 18, 10)
-    secret_room_2 = Rect(31, 7, 8, 4)
-    secret_room_3 = Rect(6, 12, 5, 8)
+    room4 = Rect(25, 50, 10, 10)
+    room4.carve(game_map)
+    create_corridoor(game_map, room1, room4)
 
-    map_components = [room1, v_corridoor_1_2, h_corridoor_1_2, room2, room3, h_corridoor_1_3, v_corridoor_2_3,
-                      secret_room_1, secret_room_2, secret_room_3]
+    room5 = Rect(75, 50, 10, 10)
+    room5.carve(game_map)
+    create_corridoor(game_map, room1, room5)
 
-    for component in map_components:
-        component.carve(game_map)
+    create_corridoor(game_map, room2, room5)
+    create_corridoor(game_map, room2, room4)
+    create_corridoor(game_map, room5, room3)
+    create_corridoor(game_map, room3, room4)
 
-    game_map.set_door(15, 21, w=3)
-    game_map.set_door(24, 36, h=3)
-    game_map.set_door(21, 16, h=2)
-    game_map.set_door(29, 16, h=2)
-    game_map.set_door(35, 21)
-    game_map.set_door(35, 30)
-    game_map.set_door(9, 12, w=2, h=8, secret=True)
-    game_map.set_door(31, 9, w=8, h=2, secret=True)
-    game_map.set_door(26, 41, w=18, h=2, secret=True, button=(30, 35))
+    rooms = [room1, room2, room3, room4, room5]
 
-    for m in range(random.randint(1, 8)):
-        monster_stats = stats(4, 2, 1)
-        monster = Monster(0, 0, "Monster", "M", (255, 100, 100), monster_stats)
-        entities.append(monster)
-        viable_coords = get_viable_coordinates(game_map)
-        place_entity(viable_coords, game_map, monster)
+    room6 = create_room((3, 147), (3, 147), 10, 10)
+    room6.carve(game_map)
+    rooms.append(room6)
+    create_corridoor(game_map, PRNG.choice(rooms), room6)
+    create_corridoor(game_map, room6, PRNG.choice(rooms))
 
-    viable_coords = get_viable_coordinates(game_map)
-    place_entity(viable_coords, game_map, player)
+    room7 = create_room((3, 147), (3, 147), 10, 10)
+    room7.carve(game_map)
+    rooms.append(room7)
+    create_corridoor(game_map, PRNG.choice(rooms), room7)
+    create_corridoor(game_map, room7, PRNG.choice(rooms))
+
+
+# TODO: Doc
+def make_map(game_map, player, num_rooms, min_size, max_size, map_border, intersect_chance):
+    # set variables for rooms to create, and sensible boundaries so rooms stay within map constraints.
+    rooms_left = num_rooms
+    first_room = True
+    boundary_x = (map_border, game_map.width - map_border)
+    boundary_y = (map_border, game_map.height - map_border)
+
+    while rooms_left:
+        new_room = create_room(boundary_x, boundary_y, min_size, max_size)
+
+        if PRNG.randint(1, 100) > intersect_chance:
+            if rooms_collide(game_map, new_room):
+                continue
+
+        try:
+            new_room.carve(game_map)
+        except IndexError:
+            continue
+        else:
+            game_map.rooms.append(new_room)
+            rooms_left -= 1
+
+            previous_room = PRNG.choice(game_map.rooms)
+
+            if first_room:
+                first_room = False
+                player.x, player.y = find_room_center(new_room)
+            else:
+                create_corridoor(game_map, new_room, previous_room)
+
+
+# TODO: Doc
+def create_room(boundary_x, boundary_y, min_size, max_size):
+    while True:
+        room_x, room_y = PRNG.randint(boundary_x[0], boundary_x[1]), PRNG.randint(boundary_y[0], boundary_y[1])
+
+        max_width = (boundary_x[1]) - room_x
+        max_height = (boundary_y[1]) - room_y
+
+        if max_width > max_size:
+            max_width = max_size
+        elif max_width < min_size:
+            continue
+
+        if max_height > max_size:
+            max_height = max_size
+        elif max_height < min_size:
+            continue
+
+        room_w, room_h = PRNG.randint(min_size, max_width), PRNG.randint(min_size, max_height)
+
+        room = Rect(room_x, room_y, room_w, room_h)
+        break
+
+    return room
+
+
+# TODO: Doc
+def rooms_collide(game_map, new_room):
+    for y in range(new_room.y1 - 2, new_room.y2 + 2):
+        for x in range(new_room.x1 - 2, new_room.x2 + 2):
+            if not game_map.viable_coords[x, y]:
+                return False
+    else:
+        return True
+
+
+# TODO: Doc
+def find_room_center(room):
+    centre_x = int((room.x1 + room.x2) / 2)
+    centre_y = int((room.y1 + room.y2) / 2)
+
+    return centre_x, centre_y
+
+
+# TODO: corridoors being created which pass through already created doors.
+
+
+def create_corridoor(game_map, new_room, previous_room):
+    px, py = find_room_center(previous_room)
+    nx, ny = find_room_center(new_room)
+
+    previous_room_rows = set([y for y in range(previous_room.y1 + 1, previous_room.y2 - 1)])
+    new_room_rows = set([y for y in range(new_room.y1 + 1, new_room.y2 - 1)])
+    matching_rows = previous_room_rows.intersection(new_room_rows)
+
+    previous_room_columns = set([x for x in range(previous_room.x1 + 1, previous_room.x2 - 1)])
+    new_room_columns = set([x for x in range(new_room.x1 + 1, new_room.x2 - 1)])
+    matching_columns = previous_room_columns.intersection(new_room_columns)
+
+    if matching_rows:
+        y = min(matching_rows)
+        breadth = PRNG.randint(1, min(3, len(matching_rows)))
+        create_h_tunnel(game_map, px, nx, y, breadth)
+        create_v_door(game_map, px, nx, y, breadth, previous_room, r_to_c=True)
+        create_v_door(game_map, px, nx, y, breadth, new_room, c_to_r=True)
+
+    elif matching_columns:
+        x = min(matching_columns)
+        breadth = PRNG.randint(1, min(3, len(matching_columns)))
+        create_v_tunnel(game_map, py, ny, x, breadth)
+        create_h_door(game_map, py, ny, x, breadth, previous_room, r_to_c=True)
+        create_h_door(game_map, py, ny, x, breadth, new_room, c_to_r=True)
+
+    else:
+        breadth = PRNG.randint(1, 3)
+
+        if PRNG.randint(0, 1) == 0:
+            create_h_tunnel(game_map, px, nx, py, breadth)  # Previous room to corridoor
+            create_v_door(game_map, px, nx, py, breadth, previous_room, r_to_c=True)
+
+            create_v_tunnel(game_map, py, ny, nx, breadth)  # Corridoor to new room
+            create_h_door(game_map, py, ny, nx, breadth, new_room, c_to_r=True)
+
+        else:
+            create_v_tunnel(game_map, py, ny, px, breadth)  # Previous room to corridoor
+            create_h_door(game_map, py, ny, px, breadth, previous_room, r_to_c=True)
+
+            create_h_tunnel(game_map, px, nx, ny, breadth)  # Corridoor to new room
+            create_v_door(game_map, px, nx, ny, breadth, new_room, c_to_r=True)
+
+
+def create_v_door(game_map, tunnel_x1, tunnel_x2, tunnel_y, tunnel_breadth, room, c_to_r=False, r_to_c=False):
+
+    if tunnel_x2 > tunnel_x1:  # direction is l to r.
+        if r_to_c:
+            game_map.set_door(room.x2, tunnel_y, w=1, h=tunnel_breadth)  # Door from prev room to corridoor.
+
+        if c_to_r:
+            game_map.set_door(room.x1 - 1, tunnel_y, w=1, h=tunnel_breadth)  # Door from corridoor to new room.
+
+    elif tunnel_x1 > tunnel_x2:  # direction is r to l.
+        if r_to_c:
+            game_map.set_door(room.x1 - 1, tunnel_y, w=1, h=tunnel_breadth)  # Door from prev room to corridoor.
+
+        if c_to_r:
+            game_map.set_door(room.x2, tunnel_y, w=1, h=tunnel_breadth)  # Door from corridoor to new room.
+
+
+def create_h_door(game_map, tunnel_y1, tunnel_y2, tunnel_x, tunnel_breadth, room, c_to_r=False, r_to_c=False):
+
+    if tunnel_y2 > tunnel_y1:  # direction is up to down.
+        if r_to_c:
+            game_map.set_door(tunnel_x, room.y2, w=tunnel_breadth, h=1)  # Door from prev room to corridoor.
+
+        if c_to_r:
+            game_map.set_door(tunnel_x, room.y1 - 1, w=tunnel_breadth, h=1)  # Door from corridoor to new room.
+
+    elif tunnel_y1 > tunnel_y2:  # direction is down to up
+        if r_to_c:
+            game_map.set_door(tunnel_x, room.y1 - 1, w=tunnel_breadth, h=1)  # Door from prev room to corridoor.
+
+        if c_to_r:
+            game_map.set_door(tunnel_x, room.y2, w=tunnel_breadth, h=1)  # Door from corridoor to new room.
+
+
+# TODO: Doc
+def create_h_tunnel(game_map, x1, x2, y, h):
+    for y in range(y, y + h):
+        for x in range(min(x1, x2), max(x1, x2) + h):
+            carve_function(game_map, x, y)
+
+
+# TODO: Doc
+def create_v_tunnel(game_map, y1, y2, x, w):
+    for x in range(x, x + w):
+        for y in range(min(y1, y2), max(y1, y2) + w):
+            carve_function(game_map, x, y)
+
+
+def carve_function(game_map, x, y):
+    game_map.transparent[x, y] = True
+    game_map.walkable[x, y] = True
+    game_map.viable_coords[x, y] = True
+    game_map.is_door[x, y] = False
+    game_map.door[x][y] = False
