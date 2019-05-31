@@ -244,20 +244,12 @@ def draw_map(game_map, map_console, player, view_port_width, view_port_height):
         if view_port_x1 <= x < view_port_x2 and view_port_y1 <= y < view_port_y2:
 
             '''
-            First we create a condition to check whether the current tile is the ground (if it's transparent)
-            then pull the char for this tile using the auto-tile function (get_render_char).
+            First pull the char for this tile using the auto-tile function (get_render_char)
+            Then get the colours which are stored in the map tile itself.
             '''
 
-            ground = game_map.transparent[x, y]
             char = get_render_char(game_map, x, y)
-
-            # Set the colours based on whether it's the ground or non-ground (walls and doors are the same colour.
-            if ground:
-                light_colour = (150, 150, 150)
-                dark_colour = (75, 75, 75)
-            else:
-                light_colour = (250, 250, 250)
-                dark_colour = (125, 125, 125)
+            light_colour, dark_colour = get_tile_colour(game_map, x, y)
 
             # If the tile is within the FOV, draw it with the light colours, if it's outside FOV and explored, use dark
             if game_map.fov[x, y]:
@@ -267,6 +259,21 @@ def draw_map(game_map, map_console, player, view_port_width, view_port_height):
             elif game_map.explored[x, y]:
                 map_console.draw_char(x, y, char, fg=dark_colour, bg=None)
 
+
+# TODO: doc
+def get_tile_colour(game_map, x, y):
+    light_r = game_map.r[x, y]
+    light_g = game_map.g[x, y]
+    light_b = game_map.b[x, y]
+
+    dark_r = int(light_r/2)
+    dark_g = int(light_g/2)
+    dark_b = int(light_b/2)
+
+    light_colour = (light_r, light_g, light_b)
+    dark_colour = (dark_r, dark_g, dark_b)
+
+    return light_colour, dark_colour
 
 # TODO: Doc
 def draw_entities(game_map, map_console, entities):

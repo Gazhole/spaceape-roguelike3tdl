@@ -1,12 +1,13 @@
 import tdl
 from game_states import GameStates
 from input_functions import handle_keys
-from map_functions import GameMap, make_map, create_set_map, Button
+from map_functions import GameMap, Button, dungeon_generator
 from entity_classes import Monster, Player, get_blocking_entities_at_location, stats
 from render_functions import render_all
 from message_functions import MessageLog
 from death_functions import kill_player, kill_monster
 from config import colours
+from dungeon_from_file import read_map_from_file
 
 
 def main():
@@ -71,8 +72,8 @@ def main():
 
     # Map - create the map object, and then run the function to generate game world.
     game_map = GameMap(map_width, map_height)
-    make_map(game_map, player, num_rooms=20, min_size=5, max_size=15, map_border=3, intersect_chance=10)
-    # create_set_map(game_map, player, entities)
+    dungeon_generator(game_map, player)
+    # game_map = read_map_from_file("maptest.txt", player, entities)
 
     # # MAIN GAME LOOP
     while not tdl.event.is_window_closed():  # Endless loop while program is still running

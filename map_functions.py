@@ -4,11 +4,20 @@ import random
 from entity_classes import Monster
 from render_functions import get_render_char
 from entity_classes import stats
+import math
+
+
+# TODO: Features to add
+# Fix autotiling glitches
+# Fix weird door layouts in intersected rooms
+# Exploration loops (join x number of maps in order of proximity rather than all random?)
+# Vary floor tile colours.
 
 
 # Set up predictable random number for testing.
 PRNG = random.Random()
-seed = random.randint(1, 1000000)
+# seed = random.randint(1, 1000000)
+seed = 352395
 PRNG.seed(seed)
 print(seed)
 
@@ -25,6 +34,7 @@ class GameMap(Map):
         - viable_coords (numpy array - bool): a representation of whether this tile is free for initial entity placement
         - is_door (numpy array - bool): refers to whether a given tile is a door, or a switch controlling a door.
         - door (list array - False or Object): a container for Door or Button objects, usually accessed via is_door
+        - r, g, b represent the colour value of each tile.
 
     Contains two methods - one to set a particular tile as a door during map creation, and another to allow the player
     to open that door during gameplay (accessed via the engine / main game loop).
@@ -40,11 +50,39 @@ class GameMap(Map):
         self.height = map_height
         self.rooms = []
 
+        self.r = np.array([[250 for y in range(map_height)] for x in range(map_width)])
+        self.g = np.array([[250 for y in range(map_height)] for x in range(map_width)])
+        self.b = np.array([[250 for y in range(map_height)] for x in range(map_width)])
+
         self.explored = np.array([[False for y in range(map_height)] for x in range(map_width)])
         self.viable_coords = np.array([[False for y in range(map_height)] for x in range(map_width)])
 
         self.is_door = np.array([[False for y in range(map_height)] for x in range(map_width)])
         self.door = [[False for y in range(map_height)] for x in range(map_width)]
+
+    def save_map_to_file(self):
+        filename = str(seed) + ".txt"
+        with open(filename, "w") as file:
+            for y in range(self.height):
+                for x in range(self.width):
+                    door = self.is_door[x, y]
+                    wall = not self.walkable[x, y] and not self.transparent[x, y] and not door
+                    ground = self.walkable[x, y] and self.transparent[x, y] and not door
+
+                    if door:
+                        print("+", end='', file=file)
+                    elif wall:
+                        print("#", end='', file=file)
+                    elif ground:
+                        print(".", end='', file=file)
+                print("", file=file)
+
+    def set_tile_colour(self, x, y, colour):
+        r, g, b = colour
+
+        self.r[x, y] = r
+        self.g[x, y] = g
+        self.b[x, y] = b
 
     def set_door(self, x, y, w=1, h=1, secret=False, button=False):
         """
@@ -54,7 +92,7 @@ class GameMap(Map):
             - x, y (int): the first tile position of the door in the game map.
             - w, h (int): the width and height of the door. Bear in mind that these are absolute, referring to x and y axes.
             - secret (bool): is this door is a normal door (the default, secret being False) or a secret door.
-            - button (False or tuple(x, y): is this door can be activated at it's own location, or done via a button.
+            - button (False or tuple(x, y, colour): is this door can be activated at it's own location, or done via a button.
               (if not a button door, set False (default), but if this is a button door a tuple (x, y) must be provided.
 
         DESCRIPTION:
@@ -83,9 +121,9 @@ class GameMap(Map):
         if the door will be a secret door.
         '''
 
-        if secret and w == 1:
+        if secret and w == 1 and h > 1:
             w = 2
-        elif secret and h == 1:
+        elif secret and h == 1 and w > 1:
             h = 2
 
         # Create a rect, adding width & height to x and y (the top left point) to calculate the bottom right point
@@ -108,6 +146,7 @@ class GameMap(Map):
                 self.walkable[xcoord, ycoord] = False
                 self.is_door[xcoord, ycoord] = True
                 self.door[xcoord][ycoord] = Door(secret, button)
+                self.set_tile_colour(xcoord, ycoord, (250, 250, 250))
 
                 '''
                 If the door is a secret door, we need to render "nothing" (i.e. the floor) when the door is open.
@@ -125,15 +164,20 @@ class GameMap(Map):
             the tile as a door (but instead, use the Button object instead of Door, storing in door array.
             Finally, set some special console characters to be rendered for the button instead of it looking like a door
             '''
-            button_x, button_y = button
+            button_x, button_y, colour = button
             self.viable_coords[button_x, button_y] = False
             self.transparent[button_x, button_y] = False
             self.walkable[button_x, button_y] = False
             self.is_door[button_x, button_y] = True
 
+            for ycoord in range(y1, y2):
+                for xcoord in range(x1, x2):
+                    self.set_tile_colour(xcoord, ycoord, colour)
+
             self.door[button_x][button_y] = Button(button_x, button_y, x, y)
             self.door[button_x][button_y].open_char = "/"
             self.door[button_x][button_y].closed_char = "\\"
+            self.set_tile_colour(button_x, button_y, colour)
 
     def open_door(self, x, y):
         """
@@ -156,6 +200,7 @@ class GameMap(Map):
         self.door[x][y].is_open = True
         self.transparent[x, y] = True
         self.walkable[x, y] = True
+        set_tile_colour_light_to_dark(self, x, y)
 
         # The if statements check whether each adjacent tile (cardinal) is a door and not open.
 
@@ -251,6 +296,57 @@ class Rect:
                 carve_function(game_map, x, y)
 
 
+# TODO: doc all functions
+class Room(Rect):
+    def __init__(self, x, y, w=None, h=None, square=True):
+        random_width, random_height = Room._set_size(square=square)
+
+        if not w:
+            if square and h:
+                w = h
+            else:
+                w = random_width
+
+        if not h:
+            if square and w:
+                h = w
+            else:
+                h = random_height
+
+        super().__init__(x, y, w, h)
+
+        self.walls = self._get_walls()
+        self.center = self.get_center()
+
+    def get_center(self):
+        centre_x = int((self.x1 + self.x2) / 2)
+        centre_y = int((self.y1 + self.y2) / 2)
+
+        return centre_x, centre_y
+
+    def _get_walls(self):
+        walls = []
+        walls.extend([(x, self.y1 - 1) for x in range(self.x1, self.x2)])
+        walls.extend([(self.x2, y) for y in range(self.y1, self.y2)])
+        walls.extend([(x, self.y2) for x in range(self.x1, self.x2)])
+        walls.extend([(self.x1 - 1, y) for y in range(self.y1, self.y2)])
+        return walls
+
+    @staticmethod
+    def _set_size(square=True):
+        possible_sizes = [5, 7, 9, 11, 13, 15]
+
+        if square:
+            w = PRNG.choice(possible_sizes)
+            h = w
+
+        else:
+            w = PRNG.choice(possible_sizes)
+            h = PRNG.choice(possible_sizes)
+
+        return w, h
+
+
 def get_viable_coordinates(game_map):
     """
     Takes the numpy array in game_map representing viable coordinates, and searches for all "True" value indices (x, y).
@@ -278,210 +374,85 @@ def place_entity(viable_coords, game_map, entity):
     game_map.viable_coords[place_x, place_y] = False
 
 
-def create_set_map(game_map, player, entities):
-    """
-    Holding function for the map generation routines later on.
-    At the moment creates a few simple rects and carves them.
-
-    :param game_map: The game_map object.
-    :param player: Player entity object
-    """
-
-    room1 = Rect(50, 50, 10, 10)
-    room1.carve(game_map)
-    player.x, player.y = find_room_center(room1)
-
-    room2 = Rect(50, 25, 10, 10)
-    room2.carve(game_map)
-    create_corridoor(game_map, room1, room2)
-
-    room3 = Rect(50, 75, 10, 10)
-    room3.carve(game_map)
-    create_corridoor(game_map, room1, room3)
-
-    room4 = Rect(25, 50, 10, 10)
-    room4.carve(game_map)
-    create_corridoor(game_map, room1, room4)
-
-    room5 = Rect(75, 50, 10, 10)
-    room5.carve(game_map)
-    create_corridoor(game_map, room1, room5)
-
-    create_corridoor(game_map, room2, room5)
-    create_corridoor(game_map, room2, room4)
-    create_corridoor(game_map, room5, room3)
-    create_corridoor(game_map, room3, room4)
-
-    rooms = [room1, room2, room3, room4, room5]
-
-    room6 = create_room((3, 147), (3, 147), 10, 10)
-    room6.carve(game_map)
-    rooms.append(room6)
-    create_corridoor(game_map, PRNG.choice(rooms), room6)
-    create_corridoor(game_map, room6, PRNG.choice(rooms))
-
-    room7 = create_room((3, 147), (3, 147), 10, 10)
-    room7.carve(game_map)
-    rooms.append(room7)
-    create_corridoor(game_map, PRNG.choice(rooms), room7)
-    create_corridoor(game_map, room7, PRNG.choice(rooms))
-
-
-# TODO: Doc
-def make_map(game_map, player, num_rooms, min_size, max_size, map_border, intersect_chance):
-    # set variables for rooms to create, and sensible boundaries so rooms stay within map constraints.
-    rooms_left = num_rooms
-    first_room = True
+def dungeon_generator(game_map, player, map_border=3, num_rooms=15, intersect_chance=0):
     boundary_x = (map_border, game_map.width - map_border)
     boundary_y = (map_border, game_map.height - map_border)
 
-    while rooms_left:
-        new_room = create_room(boundary_x, boundary_y, min_size, max_size)
+    first_room = create_room(game_map, boundary_x, boundary_y, intersect_chance)
+    player.x, player.y = first_room.center
 
-        if PRNG.randint(1, 100) > intersect_chance:
-            if rooms_collide(game_map, new_room):
-                continue
+    for i in range(num_rooms - 1):
+        previous_room = game_map.rooms[-1]
+        new_room = create_room(game_map, boundary_x, boundary_y, intersect_chance, square=False)
 
-        try:
-            new_room.carve(game_map)
-        except IndexError:
+        px, py = previous_room.center
+        nx, ny = new_room.center
+
+        breadth = PRNG.choice([1, 3])
+
+        create_v_tunnel(game_map, py, ny, px, breadth)
+        create_h_tunnel(game_map, px, nx, ny, breadth)
+
+    for room in game_map.rooms:
+        for x, y in room.walls:
+            if game_map.walkable[x, y]:
+                game_map.set_door(x, y)
+
+    game_map.save_map_to_file()
+
+
+def create_room(game_map, boundary_x, boundary_y, intersect_chance, room_x=None, room_y=None, square=True):
+    while True:
+        if not room_x:
+            x = PRNG.randint(boundary_x[0], boundary_x[-1])
+        else:
+            x = room_x
+
+        if not room_y:
+            y = PRNG.randint(boundary_y[0], boundary_y[-1])
+        else:
+            y = room_y
+
+        room = Room(x, y, square=square)
+
+        if room_out_of_bounds(game_map, boundary_x, boundary_y, room):
             continue
         else:
-            game_map.rooms.append(new_room)
-            rooms_left -= 1
+            if PRNG.randint(1, 100) > intersect_chance:
+                if room_collides(game_map, room):
+                    continue
+                else:
+                    break
 
-            previous_room = PRNG.choice(game_map.rooms)
-
-            if first_room:
-                first_room = False
-                player.x, player.y = find_room_center(new_room)
-            else:
-                create_corridoor(game_map, new_room, previous_room)
-
-
-# TODO: Doc
-def create_room(boundary_x, boundary_y, min_size, max_size):
-    while True:
-        room_x, room_y = PRNG.randint(boundary_x[0], boundary_x[1]), PRNG.randint(boundary_y[0], boundary_y[1])
-
-        max_width = (boundary_x[1]) - room_x
-        max_height = (boundary_y[1]) - room_y
-
-        if max_width > max_size:
-            max_width = max_size
-        elif max_width < min_size:
-            continue
-
-        if max_height > max_size:
-            max_height = max_size
-        elif max_height < min_size:
-            continue
-
-        room_w, room_h = PRNG.randint(min_size, max_width), PRNG.randint(min_size, max_height)
-
-        room = Rect(room_x, room_y, room_w, room_h)
-        break
-
+    game_map.rooms.append(room)
+    room.carve(game_map)
     return room
 
 
-# TODO: Doc
-def rooms_collide(game_map, new_room):
-    for y in range(new_room.y1 - 2, new_room.y2 + 2):
-        for x in range(new_room.x1 - 2, new_room.x2 + 2):
-            if not game_map.viable_coords[x, y]:
-                return False
+def room_out_of_bounds(game_map, boundary_x, boundary_y, room):
+    if boundary_x[0] < room.x1 < room.x2 < boundary_x[-1]:
+        pass
     else:
         return True
 
+    if boundary_y[0] < room.y1 < room.y2 < boundary_y[-1]:
+        pass
+    else:
+        return True
+
+    return False
+
 
 # TODO: Doc
-def find_room_center(room):
-    centre_x = int((room.x1 + room.x2) / 2)
-    centre_y = int((room.y1 + room.y2) / 2)
-
-    return centre_x, centre_y
-
-
-# TODO: corridoors being created which pass through already created doors.
-
-
-def create_corridoor(game_map, new_room, previous_room):
-    px, py = find_room_center(previous_room)
-    nx, ny = find_room_center(new_room)
-
-    previous_room_rows = set([y for y in range(previous_room.y1 + 1, previous_room.y2 - 1)])
-    new_room_rows = set([y for y in range(new_room.y1 + 1, new_room.y2 - 1)])
-    matching_rows = previous_room_rows.intersection(new_room_rows)
-
-    previous_room_columns = set([x for x in range(previous_room.x1 + 1, previous_room.x2 - 1)])
-    new_room_columns = set([x for x in range(new_room.x1 + 1, new_room.x2 - 1)])
-    matching_columns = previous_room_columns.intersection(new_room_columns)
-
-    if matching_rows:
-        y = min(matching_rows)
-        breadth = PRNG.randint(1, min(3, len(matching_rows)))
-        create_h_tunnel(game_map, px, nx, y, breadth)
-        create_v_door(game_map, px, nx, y, breadth, previous_room, r_to_c=True)
-        create_v_door(game_map, px, nx, y, breadth, new_room, c_to_r=True)
-
-    elif matching_columns:
-        x = min(matching_columns)
-        breadth = PRNG.randint(1, min(3, len(matching_columns)))
-        create_v_tunnel(game_map, py, ny, x, breadth)
-        create_h_door(game_map, py, ny, x, breadth, previous_room, r_to_c=True)
-        create_h_door(game_map, py, ny, x, breadth, new_room, c_to_r=True)
-
+def room_collides(game_map, new_room):
+    for y in range(new_room.y1 - 2, new_room.y2 + 2):
+        for x in range(new_room.x1 - 2, new_room.x2 + 2):
+            if not game_map.viable_coords[x, y]:
+                continue
+            else:
+                return True
     else:
-        breadth = PRNG.randint(1, 3)
-
-        if PRNG.randint(0, 1) == 0:
-            create_h_tunnel(game_map, px, nx, py, breadth)  # Previous room to corridoor
-            create_v_door(game_map, px, nx, py, breadth, previous_room, r_to_c=True)
-
-            create_v_tunnel(game_map, py, ny, nx, breadth)  # Corridoor to new room
-            create_h_door(game_map, py, ny, nx, breadth, new_room, c_to_r=True)
-
-        else:
-            create_v_tunnel(game_map, py, ny, px, breadth)  # Previous room to corridoor
-            create_h_door(game_map, py, ny, px, breadth, previous_room, r_to_c=True)
-
-            create_h_tunnel(game_map, px, nx, ny, breadth)  # Corridoor to new room
-            create_v_door(game_map, px, nx, ny, breadth, new_room, c_to_r=True)
-
-
-def create_v_door(game_map, tunnel_x1, tunnel_x2, tunnel_y, tunnel_breadth, room, c_to_r=False, r_to_c=False):
-
-    if tunnel_x2 > tunnel_x1:  # direction is l to r.
-        if r_to_c:
-            game_map.set_door(room.x2, tunnel_y, w=1, h=tunnel_breadth)  # Door from prev room to corridoor.
-
-        if c_to_r:
-            game_map.set_door(room.x1 - 1, tunnel_y, w=1, h=tunnel_breadth)  # Door from corridoor to new room.
-
-    elif tunnel_x1 > tunnel_x2:  # direction is r to l.
-        if r_to_c:
-            game_map.set_door(room.x1 - 1, tunnel_y, w=1, h=tunnel_breadth)  # Door from prev room to corridoor.
-
-        if c_to_r:
-            game_map.set_door(room.x2, tunnel_y, w=1, h=tunnel_breadth)  # Door from corridoor to new room.
-
-
-def create_h_door(game_map, tunnel_y1, tunnel_y2, tunnel_x, tunnel_breadth, room, c_to_r=False, r_to_c=False):
-
-    if tunnel_y2 > tunnel_y1:  # direction is up to down.
-        if r_to_c:
-            game_map.set_door(tunnel_x, room.y2, w=tunnel_breadth, h=1)  # Door from prev room to corridoor.
-
-        if c_to_r:
-            game_map.set_door(tunnel_x, room.y1 - 1, w=tunnel_breadth, h=1)  # Door from corridoor to new room.
-
-    elif tunnel_y1 > tunnel_y2:  # direction is down to up
-        if r_to_c:
-            game_map.set_door(tunnel_x, room.y1 - 1, w=tunnel_breadth, h=1)  # Door from prev room to corridoor.
-
-        if c_to_r:
-            game_map.set_door(tunnel_x, room.y2, w=tunnel_breadth, h=1)  # Door from corridoor to new room.
+        return False
 
 
 # TODO: Doc
@@ -504,3 +475,13 @@ def carve_function(game_map, x, y):
     game_map.viable_coords[x, y] = True
     game_map.is_door[x, y] = False
     game_map.door[x][y] = False
+    game_map.set_tile_colour(x, y, (150, 150, 150))
+
+
+def set_tile_colour_light_to_dark(game_map, x, y):
+    new_r = int(game_map.r[x, y] * 0.6)
+    new_g = int(game_map.g[x, y] * 0.6)
+    new_b = int(game_map.b[x, y] * 0.6)
+
+    game_map.set_tile_colour(x, y, (new_r, new_g, new_b))
+
