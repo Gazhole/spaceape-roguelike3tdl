@@ -4,20 +4,18 @@ import random
 from entity_classes import Monster
 from render_functions import get_render_char
 from entity_classes import stats
-import math
 
 
 # TODO: Features to add
-# Fix autotiling glitches
-# Fix weird door layouts in intersected rooms
 # Exploration loops (join x number of maps in order of proximity rather than all random?)
+# Fix weird door layouts in intersected rooms
+# Fix autotiling glitches
 # Vary floor tile colours.
 
 
 # Set up predictable random number for testing.
 PRNG = random.Random()
-# seed = random.randint(1, 1000000)
-seed = 352395
+seed = random.randint(1, 1000000)
 PRNG.seed(seed)
 print(seed)
 
@@ -60,6 +58,7 @@ class GameMap(Map):
         self.is_door = np.array([[False for y in range(map_height)] for x in range(map_width)])
         self.door = [[False for y in range(map_height)] for x in range(map_width)]
 
+    # TODO: Doc
     def save_map_to_file(self):
         filename = str(seed) + ".txt"
         with open(filename, "w") as file:
@@ -77,6 +76,7 @@ class GameMap(Map):
                         print(".", end='', file=file)
                 print("", file=file)
 
+    # TODO: Doc
     def set_tile_colour(self, x, y, colour):
         r, g, b = colour
 
@@ -318,12 +318,14 @@ class Room(Rect):
         self.walls = self._get_walls()
         self.center = self.get_center()
 
+    # TODO: Doc
     def get_center(self):
         centre_x = int((self.x1 + self.x2) / 2)
         centre_y = int((self.y1 + self.y2) / 2)
 
         return centre_x, centre_y
 
+    # TODO: Doc
     def _get_walls(self):
         walls = []
         walls.extend([(x, self.y1 - 1) for x in range(self.x1, self.x2)])
@@ -332,6 +334,7 @@ class Room(Rect):
         walls.extend([(self.x1 - 1, y) for y in range(self.y1, self.y2)])
         return walls
 
+    # TODO: Doc
     @staticmethod
     def _set_size(square=True):
         possible_sizes = [5, 7, 9, 11, 13, 15]
@@ -374,7 +377,8 @@ def place_entity(viable_coords, game_map, entity):
     game_map.viable_coords[place_x, place_y] = False
 
 
-def dungeon_generator(game_map, player, map_border=3, num_rooms=15, intersect_chance=0):
+# TODO: Doc
+def dungeon_generator(game_map, player, map_border=3, num_rooms=20, intersect_chance=20):
     boundary_x = (map_border, game_map.width - map_border)
     boundary_y = (map_border, game_map.height - map_border)
 
@@ -384,23 +388,99 @@ def dungeon_generator(game_map, player, map_border=3, num_rooms=15, intersect_ch
     for i in range(num_rooms - 1):
         previous_room = game_map.rooms[-1]
         new_room = create_room(game_map, boundary_x, boundary_y, intersect_chance, square=False)
+        create_corridor(game_map, previous_room, new_room)
 
-        px, py = previous_room.center
-        nx, ny = new_room.center
+    set_doors(game_map)
+    game_map.save_map_to_file()
 
-        breadth = PRNG.choice([1, 3])
 
-        create_v_tunnel(game_map, py, ny, px, breadth)
-        create_h_tunnel(game_map, px, nx, ny, breadth)
+def sort_rooms_by_proximity(game_map):
+    sorted_rooms = sorted(game_map.rooms, key=lambda x: (x.center[0], x.center[1]))
 
+    # TODO: find a way to sort by center x and y and create a viable path through the dungeon
+
+    return sorted_rooms
+
+
+def set_doors(game_map):
     for room in game_map.rooms:
         for x, y in room.walls:
             if game_map.walkable[x, y]:
                 game_map.set_door(x, y)
 
-    game_map.save_map_to_file()
+
+# TODO: Doc
+def create_corridor(game_map, previous_room, new_room):
+    px, py = previous_room.center
+    nx, ny = new_room.center
+
+    previous_room_rows = set([y for y in range(previous_room.y1 + 1, previous_room.y2 - 1)])
+    new_room_rows = set([y for y in range(new_room.y1 + 1, new_room.y2 - 1)])
+    matching_rows = previous_room_rows.intersection(new_room_rows)
+
+    previous_room_columns = set([x for x in range(previous_room.x1 + 1, previous_room.x2 - 1)])
+    new_room_columns = set([x for x in range(new_room.x1 + 1, new_room.x2 - 1)])
+    matching_columns = previous_room_columns.intersection(new_room_columns)
+
+    if matching_rows:
+        y = min(matching_rows)
+        breadth = PRNG.choice([1, min(3, len(matching_rows))])
+        create_h_tunnel(game_map, px, nx, y, breadth)
+
+    elif matching_columns:
+        x = min(matching_columns)
+        breadth = PRNG.choice([1, min(3, len(matching_columns))])
+        create_v_tunnel(game_map, py, ny, x, breadth)
+
+    else:
+        arms = PRNG.choice([2, 2, 2, 2, 3, 3, 4])
+        breadth = PRNG.choice([1, 3])
+
+        if arms == 2:
+            if PRNG.randint(0, 1) == 0:
+                create_v_tunnel(game_map, py, ny, px, breadth)
+                create_h_tunnel(game_map, px, nx, ny, breadth)
+
+            else:
+                create_h_tunnel(game_map, px, nx, py, breadth)
+                create_v_tunnel(game_map, py, ny, nx, breadth)
+
+        elif arms == 3:
+            if PRNG.randint(0, 1) == 0:
+                halfway_y = find_halfway(py, ny)
+
+                create_v_tunnel(game_map, py, halfway_y, px, breadth)
+                create_h_tunnel(game_map, px, nx, halfway_y, breadth)
+                create_v_tunnel(game_map, halfway_y, ny, nx, breadth)
+
+            else:
+                halfway_x = find_halfway(px, nx)
+
+                create_h_tunnel(game_map, px, halfway_x, py, breadth)
+                create_v_tunnel(game_map, py, ny, halfway_x, breadth)
+                create_h_tunnel(game_map, halfway_x, nx, ny, breadth)
+
+        elif arms == 4:
+            if PRNG.randint(0, 1) == 0:
+                halfway_y = find_halfway(py, ny)
+                halfway_x = find_halfway(px, nx)
+
+                create_v_tunnel(game_map, py, halfway_y, px, breadth)
+                create_h_tunnel(game_map, px, halfway_x, halfway_y, breadth)
+                create_v_tunnel(game_map, halfway_y, ny, halfway_x, breadth)
+                create_h_tunnel(game_map, halfway_x, nx, ny, breadth)
+
+            else:
+                halfway_x = find_halfway(px, nx)
+                halfway_y = find_halfway(py, ny)
+
+                create_h_tunnel(game_map, px, halfway_x, py, breadth)
+                create_v_tunnel(game_map, py, halfway_y, halfway_x, breadth)
+                create_h_tunnel(game_map, halfway_x, nx, halfway_y, breadth)
+                create_v_tunnel(game_map, halfway_y, ny, nx, breadth)
 
 
+# TODO: Doc
 def create_room(game_map, boundary_x, boundary_y, intersect_chance, room_x=None, room_y=None, square=True):
     while True:
         if not room_x:
@@ -415,7 +495,7 @@ def create_room(game_map, boundary_x, boundary_y, intersect_chance, room_x=None,
 
         room = Room(x, y, square=square)
 
-        if room_out_of_bounds(game_map, boundary_x, boundary_y, room):
+        if room_out_of_bounds(boundary_x, boundary_y, room):
             continue
         else:
             if PRNG.randint(1, 100) > intersect_chance:
@@ -429,7 +509,16 @@ def create_room(game_map, boundary_x, boundary_y, intersect_chance, room_x=None,
     return room
 
 
-def room_out_of_bounds(game_map, boundary_x, boundary_y, room):
+# TODO: Doc
+def find_halfway(pxy, nxy):
+    distance = max(pxy, nxy) - min(pxy, nxy)
+    halfway = min(pxy, nxy) + int(distance/2)
+
+    return halfway
+
+
+# TODO: Doc
+def room_out_of_bounds(boundary_x, boundary_y, room):
     if boundary_x[0] < room.x1 < room.x2 < boundary_x[-1]:
         pass
     else:
@@ -469,6 +558,7 @@ def create_v_tunnel(game_map, y1, y2, x, w):
             carve_function(game_map, x, y)
 
 
+# TODO: Doc
 def carve_function(game_map, x, y):
     game_map.transparent[x, y] = True
     game_map.walkable[x, y] = True
@@ -478,6 +568,7 @@ def carve_function(game_map, x, y):
     game_map.set_tile_colour(x, y, (150, 150, 150))
 
 
+# TODO: Doc
 def set_tile_colour_light_to_dark(game_map, x, y):
     new_r = int(game_map.r[x, y] * 0.6)
     new_g = int(game_map.g[x, y] * 0.6)

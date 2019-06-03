@@ -275,6 +275,7 @@ def get_tile_colour(game_map, x, y):
 
     return light_colour, dark_colour
 
+
 # TODO: Doc
 def draw_entities(game_map, map_console, entities):
     entities_in_render_order = sorted(entities, key=lambda x: x.render_order.value)
