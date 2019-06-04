@@ -4,6 +4,7 @@ import random
 from entity_classes import Monster
 from render_functions import get_render_char
 from entity_classes import stats
+import math
 
 
 # TODO: Features to add
@@ -378,7 +379,45 @@ def place_entity(viable_coords, game_map, entity):
 
 
 # TODO: Doc
-def dungeon_generator(game_map, player, map_border=3, num_rooms=20, intersect_chance=20):
+def dungeon_generator_complex(game_map, player, num_rooms, cross_link_chance, intersect_chance, map_border=3):
+    boundary_x = (map_border, game_map.width - map_border)
+    boundary_y = (map_border, game_map.height - map_border)
+
+    first_room = create_room(game_map, boundary_x, boundary_y, intersect_chance)
+    player.x, player.y = first_room.center
+
+    for i in range(num_rooms - 1):
+        create_room(game_map, boundary_x, boundary_y, intersect_chance, square=False)
+
+    rooms_to_link = list(game_map.rooms)
+
+    current_room = first_room
+    for i in range(num_rooms):
+        new_room = get_closest_room(rooms_to_link, current_room)
+
+        if not new_room:
+            break
+        else:
+            create_corridor(game_map, current_room, new_room)
+            current_room = new_room
+
+    number_of_cross_links = int((len(game_map.rooms) * int(cross_link_chance / 10)) / 10)
+    print(number_of_cross_links)
+
+    for i in range(number_of_cross_links):
+        rooms_to_cross_link = list(game_map.rooms)
+
+        previous_room = PRNG.choice(rooms_to_cross_link)
+        rooms_to_cross_link.remove(previous_room)
+
+        new_room = PRNG.choice(rooms_to_cross_link)
+        create_corridor(game_map, previous_room, new_room)
+
+    set_doors(game_map)
+    game_map.save_map_to_file()
+
+
+def dungeon_generator_simple(game_map, player, map_border=3, num_rooms=20, intersect_chance=20):
     boundary_x = (map_border, game_map.width - map_border)
     boundary_y = (map_border, game_map.height - map_border)
 
@@ -394,12 +433,26 @@ def dungeon_generator(game_map, player, map_border=3, num_rooms=20, intersect_ch
     game_map.save_map_to_file()
 
 
-def sort_rooms_by_proximity(game_map):
-    sorted_rooms = sorted(game_map.rooms, key=lambda x: (x.center[0], x.center[1]))
+def get_closest_room(rooms_to_link, current_room):
+    proximity_map = dict()
 
-    # TODO: find a way to sort by center x and y and create a viable path through the dungeon
+    for room in rooms_to_link:
+        if id(room) == id(current_room):
+            continue
+        else:
+            x1, y1 = current_room.center
+            x2, y2 = room.center
+            distance = math.sqrt(((x2 - x1) ** 2) + ((y2 - y1) ** 2))
+            proximity_map[distance] = room
 
-    return sorted_rooms
+    rooms_by_distance = sorted(proximity_map.keys())
+    if not rooms_by_distance:
+        return 0
+    else:
+        closest_room = rooms_by_distance[0]
+        rooms_to_link.remove(current_room)
+
+    return proximity_map[closest_room]
 
 
 def set_doors(game_map):

@@ -1,7 +1,7 @@
 import tdl
 from game_states import GameStates
 from input_functions import handle_keys
-from map_functions import GameMap, Button, dungeon_generator
+from map_functions import GameMap, Button, dungeon_generator_simple, dungeon_generator_complex
 from entity_classes import Monster, Player, get_blocking_entities_at_location, stats
 from render_functions import render_all
 from message_functions import MessageLog
@@ -72,7 +72,7 @@ def main():
 
     # Map - create the map object, and then run the function to generate game world.
     game_map = GameMap(map_width, map_height)
-    dungeon_generator(game_map, player)
+    dungeon_generator_complex(game_map, player, num_rooms=15, intersect_chance=0, cross_link_chance=30)
     # game_map = read_map_from_file("maptest.txt", player, entities)
 
     # # MAIN GAME LOOP
