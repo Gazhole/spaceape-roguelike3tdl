@@ -338,7 +338,7 @@ class Room(Rect):
     # TODO: Doc
     @staticmethod
     def _set_size(square=True):
-        possible_sizes = [5, 7, 9, 11, 13, 15]
+        possible_sizes = [9, 11, 13, 15, 17]
 
         if square:
             w = PRNG.choice(possible_sizes)
@@ -414,9 +414,11 @@ def dungeon_generator_complex(game_map, player, num_rooms, cross_link_chance, in
         create_corridor(game_map, previous_room, new_room)
 
     set_doors(game_map)
+    remove_junk_doors(game_map, boundary_x, boundary_y)
     game_map.save_map_to_file()
 
 
+# TODO: Doc
 def dungeon_generator_simple(game_map, player, map_border=3, num_rooms=20, intersect_chance=20):
     boundary_x = (map_border, game_map.width - map_border)
     boundary_y = (map_border, game_map.height - map_border)
@@ -430,9 +432,11 @@ def dungeon_generator_simple(game_map, player, map_border=3, num_rooms=20, inter
         create_corridor(game_map, previous_room, new_room)
 
     set_doors(game_map)
+    remove_junk_doors(game_map, boundary_x, boundary_y)
     game_map.save_map_to_file()
 
 
+# TODO: Doc
 def get_closest_room(rooms_to_link, current_room):
     proximity_map = dict()
 
@@ -455,11 +459,58 @@ def get_closest_room(rooms_to_link, current_room):
     return proximity_map[closest_room]
 
 
+# TODO: doc
 def set_doors(game_map):
     for room in game_map.rooms:
         for x, y in room.walls:
             if game_map.walkable[x, y]:
                 game_map.set_door(x, y)
+
+
+# TODO: Doc
+def remove_junk_doors(game_map, boundary_x, boundary_y):
+    change = False
+
+    for y in range(boundary_y[0], boundary_y[1]):
+        for x in range(boundary_x[0], boundary_x[1]):
+            if game_map.is_door[x, y]:
+                north_tile = (x, y - 1)
+                east_tile = (x + 1, y)
+                south_tile = (x, y + 1)
+                west_tile = (x - 1, y)
+
+                tiles = [north_tile, east_tile, south_tile, west_tile]
+
+                tile_map = list()
+                for tile in tiles:
+                    tx, ty = tile
+                    tile_type = get_tile_type(game_map, tx, ty)
+                    tile_map.append(tile_type)
+
+                blank = {"wall": False, "ground": True, "door": False}
+
+                blank_score = 0
+                for tile in tile_map:
+                    if tile == blank:
+                        blank_score += 1
+
+                if blank_score > 2:
+                    game_map.is_door[x, y] = False
+                    game_map.door[x][y] = False
+                    carve_function(game_map, x, y)
+                    change = True
+
+    if change:
+        remove_junk_doors(game_map, boundary_x, boundary_y)
+
+
+# TODO: Doc
+def get_tile_type(game_map, x, y):
+    wall = not game_map.transparent[x, y] and not game_map.walkable[x, y] and not game_map.is_door[x, y]
+    ground = game_map.transparent[x, y] and game_map.walkable[x, y] and not game_map.is_door[x, y]
+    door = game_map.is_door[x, y]
+
+    return {"wall": wall, "ground": ground, "door": door}
 
 
 # TODO: Doc
