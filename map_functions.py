@@ -8,10 +8,13 @@ import math
 
 
 # TODO: Features to add
-# Exploration loops (join x number of maps in order of proximity rather than all random?)
-# Fix weird door layouts in intersected rooms
+# Exploration loops (when linking rooms cross link automatically every few rooms)
+# Fix weird door layouts in intersected rooms - ALMOST DONE!!! Just walls along a wall adjacent.
 # Fix autotiling glitches
-# Vary floor tile colours.
+# Entry and Exit placeholders to check journey
+# Stop monsters spawning in first room.
+# Place secret doors.
+# Place button doors.
 
 
 # Set up predictable random number for testing.
@@ -60,7 +63,7 @@ class GameMap(Map):
         self.door = [[False for y in range(map_height)] for x in range(map_width)]
 
     # TODO: Doc
-    def save_map_to_file(self):
+    def save_map_to_file(self, entities_list):
         filename = str(seed) + ".txt"
         with open(filename, "w") as file:
             for y in range(self.height):
@@ -69,12 +72,21 @@ class GameMap(Map):
                     wall = not self.walkable[x, y] and not self.transparent[x, y] and not door
                     ground = self.walkable[x, y] and self.transparent[x, y] and not door
 
+                    for entity in entities_list:
+                        if entity.x == x and entity.y == y:
+                            door = False
+                            wall = False
+                            ground = False
+                            monster = entity
+
                     if door:
                         print("+", end='', file=file)
                     elif wall:
                         print("#", end='', file=file)
                     elif ground:
                         print(".", end='', file=file)
+                    else:
+                        print(monster.char, end='', file=file)
                 print("", file=file)
 
     # TODO: Doc
@@ -291,10 +303,13 @@ class Rect:
         self.y1 = y
         self.y2 = y + h
 
+        self.inside = []
+
     def carve(self, game_map):
         for y in range(self.y1, self.y2):
             for x in range(self.x1, self.x2):
                 carve_function(game_map, x, y)
+                self.inside.append((x, y))
 
 
 # TODO: doc all functions
@@ -363,7 +378,7 @@ def get_viable_coordinates(game_map):
     return viable_coords
 
 
-def place_entity(viable_coords, game_map, entity):
+def place_entity(game_map, entity, entities_list, room=None):
     """
     Using a list of viable coordinates from the game map, selects one point at random, and updates the entity's location
     This point is then set to False in GameMap.viable and removed from the viable coords list.
@@ -372,14 +387,40 @@ def place_entity(viable_coords, game_map, entity):
     :param game_map: The GameMap object
     :param entity: The entity to be placed
     """
-    random.shuffle(viable_coords)
-    place_x, place_y = viable_coords.pop()
+    viable_coords = get_viable_coordinates(game_map)
+
+    if room:
+        while True:
+            place = PRNG.choice(room.inside)
+            if place in viable_coords:
+                break
+            else:
+                continue
+    else:
+        place = PRNG.choice(viable_coords)
+
+    place_x, place_y = place
+    viable_coords.remove(place)
+
     entity.x, entity.y = place_x, place_y
     game_map.viable_coords[place_x, place_y] = False
+    entities_list.append(entity)
+
+
+def place_entities(game_map, entities_list, max_number_of_entities, room=None):
+    for i in range(PRNG.randint(0, max_number_of_entities)):
+        if room:
+            monster_stats = stats(hp=2, power=2, defense=1)
+            monster = Monster(map_x=0, map_y=0, char="D", name="Demon", colour=(255, 50, 50), stats=monster_stats)
+        else:
+            monster_stats = stats(hp=4, power=3, defense=1)
+            monster = Monster(map_x=0, map_y=0, char="T", name="Troll", colour=(100, 200, 50), stats=monster_stats)
+
+        place_entity(game_map, monster, entities_list, room=room)
 
 
 # TODO: Doc
-def dungeon_generator_complex(game_map, player, num_rooms, cross_link_chance, intersect_chance, map_border=3):
+def dungeon_generator_complex(game_map, player, entities_list, max_monsters_per_room, num_rooms, cross_link_chance, intersect_chance, map_border=3):
     boundary_x = (map_border, game_map.width - map_border)
     boundary_y = (map_border, game_map.height - map_border)
 
@@ -387,7 +428,8 @@ def dungeon_generator_complex(game_map, player, num_rooms, cross_link_chance, in
     player.x, player.y = first_room.center
 
     for i in range(num_rooms - 1):
-        create_room(game_map, boundary_x, boundary_y, intersect_chance, square=False)
+        room = create_room(game_map, boundary_x, boundary_y, intersect_chance, square=False)
+        place_entities(game_map, entities_list, max_monsters_per_room, room=room)
 
     rooms_to_link = list(game_map.rooms)
 
@@ -402,7 +444,6 @@ def dungeon_generator_complex(game_map, player, num_rooms, cross_link_chance, in
             current_room = new_room
 
     number_of_cross_links = int((len(game_map.rooms) * int(cross_link_chance / 10)) / 10)
-    print(number_of_cross_links)
 
     for i in range(number_of_cross_links):
         rooms_to_cross_link = list(game_map.rooms)
@@ -415,25 +456,9 @@ def dungeon_generator_complex(game_map, player, num_rooms, cross_link_chance, in
 
     set_doors(game_map)
     remove_junk_doors(game_map, boundary_x, boundary_y)
-    game_map.save_map_to_file()
+    place_entities(game_map, entities_list, max_number_of_entities=num_rooms)
 
-
-# TODO: Doc
-def dungeon_generator_simple(game_map, player, map_border=3, num_rooms=20, intersect_chance=20):
-    boundary_x = (map_border, game_map.width - map_border)
-    boundary_y = (map_border, game_map.height - map_border)
-
-    first_room = create_room(game_map, boundary_x, boundary_y, intersect_chance)
-    player.x, player.y = first_room.center
-
-    for i in range(num_rooms - 1):
-        previous_room = game_map.rooms[-1]
-        new_room = create_room(game_map, boundary_x, boundary_y, intersect_chance, square=False)
-        create_corridor(game_map, previous_room, new_room)
-
-    set_doors(game_map)
-    remove_junk_doors(game_map, boundary_x, boundary_y)
-    game_map.save_map_to_file()
+    game_map.save_map_to_file(entities_list)
 
 
 # TODO: Doc
@@ -636,7 +661,7 @@ def room_out_of_bounds(boundary_x, boundary_y, room):
     return False
 
 
-# TODO: Doc
+#TODO: Doc
 def room_collides(game_map, new_room):
     for y in range(new_room.y1 - 2, new_room.y2 + 2):
         for x in range(new_room.x1 - 2, new_room.x2 + 2):
@@ -669,7 +694,8 @@ def carve_function(game_map, x, y):
     game_map.viable_coords[x, y] = True
     game_map.is_door[x, y] = False
     game_map.door[x][y] = False
-    game_map.set_tile_colour(x, y, (150, 150, 150))
+    r, g, b = vary_tile_colour(150, 150, 150)
+    game_map.set_tile_colour(x, y, (r, g, b))
 
 
 # TODO: Doc
@@ -680,3 +706,13 @@ def set_tile_colour_light_to_dark(game_map, x, y):
 
     game_map.set_tile_colour(x, y, (new_r, new_g, new_b))
 
+
+# TODO: doc
+def vary_tile_colour(r, g, b):
+    variance = PRNG.randint(-20, 20)
+
+    new_r = r + variance
+    new_g = g + variance
+    new_b = b + variance
+
+    return new_r, new_g, new_b

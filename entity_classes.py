@@ -66,11 +66,11 @@ class Actor(Entity):
 
         if damage > 0:
             results.append({"message": Message("{} takes {} damage from {}"
-                           .format(target.name, damage, self.name, target.hp), colours["light_red"])})
+                           .format(target.name, damage, self.name, target.hp), self.colour)})
             results.extend(target.take_damage(damage))
 
         else:
-            results.append({"message": Message("{} attacks {} but does no damage".format(self.name, target.name), colours["red"])})
+            results.append({"message": Message("{} attacks {} but does no damage".format(self.name, target.name), self.colour)})
 
         return results
 
