@@ -127,7 +127,7 @@ def get_render_char(game_map, x, y):
 
     # Create a 3x3 mask corresponding to the 9 tile cell - values should be exponential to ensure no tile combination
     # produces a duplicate value when summed together. This current set of values does not achieve this in all cases.
-    mask = np.array([[1, 3, 9], [10, 30, 90], [100, 300, 900]])
+    mask = np.array([[1, 2, 4], [8, 0, 16], [32, 64, 128]])
 
     # The cell map is another 3x3 array False by default, then each transparent cell on the game map is set to True.
     cell_map = np.array([[False for y in range(3)] for x in range(3)])
@@ -158,53 +158,83 @@ def get_render_char(game_map, x, y):
     '''
 
     chars = dict()
-    # Horizontal wall
-    chars[1300] = 205
-    chars[13] = 205
-    chars[400] = 205
-    chars[1200] = 205
-    chars[4] = 205
-    chars[12] = 205
-    chars[1313] = 205
-    chars[1212] = 205
-    chars[404] = 205
-    # Vertical wall
-    chars[999] = 186
-    chars[111] = 186
-    chars[990] = 186
-    chars[99] = 186
-    chars[110] = 186  # DUPLICATE combination works for two layouts
-    chars[11] = 186
-    chars[1110] = 186
-    chars[1100] = 186
-    # Top Left corner
-    chars[900] = 201
-    chars[123] = 201
-    chars[113] = 201
-    chars[120] = 201
-    chars[23] = 201
-    chars[114] = 201
-    # Top Right corner
-    chars[100] = 187
-    chars[1003] = 187
-    chars[913] = 187
-    chars[1000] = 187
-    chars[1002] = 187
-    chars[103] = 187
-    # Bottom Left corner
-    chars[9] = 200
-    chars[1311] = 200
-    chars[1011] = 200
-    chars[1301] = 200
-    chars[1310] = 200
-    chars[411] = 200
-    # Bottom Right corner
+    # Horizontal Wall = 205
+    # Vertical Wall = 186
+    # Top Left Corner = 201
+    # Top Right Corner = 187
+    # Bottom Left Corner = 200
+    # Bottom Right Corner = 188
+    # Right Tee = 185
+    # Left Tee = 204
+    # Inverse Tee = 202
+    # Tee = 203
+
+    # # Use the bitmask helper excel file
+    # [1    2     4]
+    # [8    0    16]
+    # [32   64  128]
+
+    chars[103] = 205
+    chars[199] = 205
+    chars[201] = 200
+    chars[43] = 201
+    chars[64] = 203
+    chars[168] = 204
+    chars[33] = 186
+    chars[157] = 186
+    chars[188] = 186
+    chars[185] = 186
+    chars[189] = 186
+    chars[144] = 186
+    chars[148] = 186
+    chars[20] = 186
+    chars[41] = 186
+    chars[9] = 186
+    chars[40] = 186
+    chars[61] = 186
+    chars[184] = 186
+    chars[150] = 187
+    chars[32] = 187
+    chars[151] = 187
+    chars[149] = 185
+    chars[212] = 188
+    chars[240] = 188
+    chars[176] = 185
+    chars[180] = 185
     chars[1] = 188
-    chars[1399] = 188
-    chars[1099] = 188
-    chars[1309] = 188
-    chars[1299] = 188
-    chars[1390] = 188
+    chars[244] = 188
+    chars[232] = 200
+    chars[105] = 200
+    chars[4] = 200
+    chars[233] = 200
+    chars[169] = 204
+    chars[47] = 201
+    chars[128] = 201
+    chars[45] = 204
+    chars[196] = 202
+    chars[253] = 202
+    chars[245] = 202
+    chars[97] = 202
+    chars[228] = 202
+    chars[225] = 202
+    chars[183] = 203
+    chars[175] = 203
+    chars[191] = 186
+    chars[134] = 203
+    chars[167] = 203
+    chars[39] = 203
+    chars[135] = 203
+    chars[239] = 205
+    chars[246] = 205
+    chars[230] = 205
+    chars[227] = 205
+    chars[231] = 205
+    chars[192] = 205
+    chars[6] = 205
+    chars[7] = 205
+    chars[224] = 205
+    chars[3] = 205
+    chars[96] = 205
 
     '''
     Try to return a value from the dict above.

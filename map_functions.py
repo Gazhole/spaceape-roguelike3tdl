@@ -10,7 +10,6 @@ import math
 # TODO: Features to add
 # Exploration loops (when linking rooms cross link automatically every few rooms)
 # Fix weird door layouts in intersected rooms - ALMOST DONE!!! Just walls along a wall adjacent.
-# Fix autotiling glitches
 # Entry and Exit placeholders to check journey
 # Stop monsters spawning in first room.
 # Place secret doors.
@@ -20,6 +19,11 @@ import math
 # Set up predictable random number for testing.
 PRNG = random.Random()
 seed = random.randint(1, 1000000)
+
+# # Testing levels
+# seed = 888727
+# seed = 513201
+
 PRNG.seed(seed)
 print(seed)
 
