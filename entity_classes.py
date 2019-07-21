@@ -3,8 +3,9 @@ import math
 from collections import namedtuple
 from message_functions import Message
 from config import colours
+from random import randint
 
-stats = namedtuple("stats", ["hp", "power", "defense"])
+stats = namedtuple("stats", ["hp", "arm", "mp", "str", "dex"])
 
 
 class Entity:
@@ -29,6 +30,7 @@ class Entity:
         self.colour = colour
         self.blocks = False
         self.render_order = RenderOrder.CORPSE
+        self.id = id(self)
 
 
 class Actor(Entity):
@@ -42,8 +44,12 @@ class Actor(Entity):
         self.blocks = True
         self.max_hp = stats.hp
         self.hp = stats.hp
-        self.power = stats.power
-        self.defense = stats.defense
+        self.max_arm = stats.arm
+        self.arm = stats.arm
+        self.max_mp = stats.mp
+        self.mp = stats.mp
+        self.str = stats.str
+        self.dex = stats.dex
 
     def move(self, dx, dy):
         self.x += dx
@@ -62,7 +68,24 @@ class Actor(Entity):
     def attack(self, target):
         results = []
 
-        damage = self.power - target.defense
+        self_crit_roll = randint(1, 20)
+        target_crit_roll = randint(1, 20)
+
+        if self_crit_roll == 1:
+            attack_power = randint(int(self.str * 0.25), int(self.str * 0.5))
+        elif self_crit_roll == 20:
+            attack_power = randint(int(self.str * 1), int(self.str * 1.25))
+        else:
+            attack_power = randint(int(self.str * 0.75), int(self.str * 1))
+
+        if target_crit_roll == 1:
+            dodge = randint(int(target.dex * 0), int(target.dex * 0.25))
+        elif self_crit_roll == 20:
+            dodge = randint(int(target.dex * 0.75), int(target.dex * 1))
+        else:
+            dodge = randint(int(target.dex * 0.5), int(target.dex * 0.75))
+
+        damage = attack_power - dodge
 
         if damage > 0:
             results.append({"message": Message("{} takes {} damage from {}"

@@ -19,14 +19,16 @@ def main():
     view_port_width, view_port_height = (30, 30)
 
     # Screen = derive from view port. Leave 2 cells at each side (if no side panels), 10 at top and bottom for HUD.
-    screen_width = view_port_width + 19
-    screen_height = view_port_height + 24
+    screen_width, screen_height = (view_port_width + 19, view_port_height + 24)
 
     # Message log (bottom panel)
     message_log_width, message_log_height = (screen_width - 4, 8)
 
     # HUD (top panel)
-    hud_width, hud_height = (screen_width - 4, 10)
+    hud_width, hud_height = (screen_width - 4, 7)
+
+    # Right Panel
+    right_panel_width, right_panel_height = (screen_width - (view_port_width + 4), view_port_height)
 
     # Dict to contain screen architecture
     screen_layout = dict()
@@ -35,6 +37,7 @@ def main():
     screen_layout["view_port"] = (view_port_width, view_port_height)
     screen_layout["message_log"] = (message_log_width, message_log_height)
     screen_layout["hud"] = (hud_width, hud_height)
+    screen_layout["right"] = (right_panel_width, right_panel_height)
 
     # # INITIALISE TDL CONSOLE ENGINE
     # General - set the font to be used, and fps limit.
@@ -47,9 +50,10 @@ def main():
     message_console = tdl.Console(message_log_width, message_log_height)
     view_port_console = tdl.Console(view_port_width, view_port_height)
     hud_console = tdl.Console(hud_width, hud_height)
+    right_console = tdl.Console(right_panel_width, right_panel_height)
 
     # Holding list to be unpacked in render function.
-    all_consoles = [root_console, view_port_console, map_console, message_console, hud_console]
+    all_consoles = [root_console, view_port_console, map_console, message_console, hud_console, right_console]
 
     # Set up HUD panels
     message_log = MessageLog(0, 0, width=message_log_width, height=message_log_height)
@@ -66,7 +70,7 @@ def main():
     mouse_coordinates = (0, 0)
 
     # Player & entities - set up player stats, then put in holding list for all game entities.
-    player_stats = stats(100, 3, 1)
+    player_stats = stats(hp=200, arm=50, mp=25, str=4, dex=2)
     player = Player(5, 5, "Bolly Angerfist", "@", (255, 255, 255), player_stats)
     entities = [player]
 

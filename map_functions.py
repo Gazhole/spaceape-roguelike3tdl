@@ -5,6 +5,7 @@ from entity_classes import Monster
 from render_functions import get_render_char
 from entity_classes import stats
 import math
+from entity_templates import monster_manual
 
 
 # TODO: Features to add
@@ -23,6 +24,8 @@ seed = random.randint(1, 1000000)
 # # Testing levels
 # seed = 888727
 # seed = 513201
+# seed = 130875
+# seed = 524937
 
 PRNG.seed(seed)
 print(seed)
@@ -413,13 +416,8 @@ def place_entity(game_map, entity, entities_list, room=None):
 
 def place_entities(game_map, entities_list, max_number_of_entities, room=None):
     for i in range(PRNG.randint(0, max_number_of_entities)):
-        if room:
-            monster_stats = stats(hp=2, power=2, defense=1)
-            monster = Monster(map_x=0, map_y=0, char="D", name="Demon", colour=(255, 50, 50), stats=monster_stats)
-        else:
-            monster_stats = stats(hp=4, power=3, defense=1)
-            monster = Monster(map_x=0, map_y=0, char="T", name="Troll", colour=(100, 200, 50), stats=monster_stats)
-
+        monster_name, monster_char, monster_colour, monster_stats = PRNG.choice(monster_manual["level1"])
+        monster = Monster(0, 0, monster_name, monster_char, monster_colour, monster_stats)
         place_entity(game_map, monster, entities_list, room=room)
 
 
@@ -713,7 +711,7 @@ def set_tile_colour_light_to_dark(game_map, x, y):
 
 # TODO: doc
 def vary_tile_colour(r, g, b):
-    variance = PRNG.randint(-20, 20)
+    variance = PRNG.randint(-25, 25)
 
     new_r = r + variance
     new_g = g + variance

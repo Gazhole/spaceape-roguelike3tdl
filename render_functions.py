@@ -28,32 +28,69 @@ def render_all(game_map, all_consoles, player, entities, fov_recompute, screen_l
     """
 
     # Unpack all consoles.
-    root_console, view_port_console, map_console, message_console, hud_console = all_consoles
+    root_console, view_port_console, map_console, message_console, hud_console, right_console = all_consoles
 
     # Unpack screen layout
     view_port_width, view_port_height = screen_layout["view_port"]
     message_log_width, message_log_height = screen_layout["message_log"]
     hud_width, hud_height = screen_layout["hud"]
+    right_con_width, right_con_height = screen_layout["right"]
 
-    # Re-draw graphics if the fov recompute trigger has been set.
+    # Re-draw HUD regardless of FOV Recompute
+    draw_hud(hud_console, right_console, view_port_width, view_port_height, player, game_map, entities, mouse_coordinates)
+
+    update_hud(root_console, hud_console, right_console, hud_width, hud_height, right_con_width, right_con_height)
+
+    # Re-draw in-game graphics only if the fov recompute trigger has been set.
     if fov_recompute:
         draw_map(game_map, map_console, player, view_port_width, view_port_height)  # Draw the map
         draw_entities(game_map, map_console, entities)  # Draw the game entities
-        draw_message_log(message_console, message_log)  # Draw the message log
-        draw_hud(hud_console, player)
+        draw_message_log(message_console, message_log)  # Draw the message lo
 
         # Update the root console
-        update_display(game_map, player,
-                       root_console, view_port_console, map_console, message_console, hud_console,
-                       view_port_width, view_port_height, message_log_width, message_log_height, hud_width, hud_height)
+        update_game_display(game_map, player,
+                       root_console, view_port_console, map_console, message_console,
+                       view_port_width, view_port_height, message_log_width, message_log_height)
 
     # Clear entities from the map console ready for update next frame.
     clear_all(map_console, entities)
 
 
-def draw_hud(hud_console, player):
+def draw_hud(hud_console, right_console, view_port_width, view_port_height, player, game_map, entities, mouse_coordinates):
+    # Top HUD
     hud_console.draw_str(0, 0, player.name, bg=None, fg=colours["white"])
-    render_status_bar(hud_console, 17, 0, 10, player.hp, player.max_hp, colours["light_red"], colours["dark_red"])
+    hud_console.draw_str(0, 2, "HP:", bg=None, fg=colours["white"])
+    render_status_bar(hud_console, 4, 2, len(player.name)-4, player.hp, player.max_hp, colours["light_red"], colours["dark_red"])
+    hud_console.draw_str(0, 3, "AR:", bg=None, fg=colours["white"])
+    render_status_bar(hud_console, 4, 3, len(player.name)-4, player.arm, player.max_arm, colours["light_blue"], colours["dark_blue"])
+    hud_console.draw_str(0, 4, "MP:", bg=None, fg=colours["white"])
+    render_status_bar(hud_console, 4, 4, len(player.name)-4, player.mp, player.max_mp, colours["light_yellow"], colours["dark_yellow"])
+
+    # RIGHT HUD
+    view_x1, view_y1, view_x2, view_y2 = get_view_port_position(player, game_map, view_port_width, view_port_height)
+
+    mouse_scr_x, mouse_scr_y = mouse_coordinates
+    mouse_map_x, mouse_map_y = map_from_screen(mouse_scr_x, mouse_scr_y, view_x1, view_y1)
+
+    list_y = 2
+    right_console.draw_str(0, 0, "Visible:")
+    for entity in entities:
+        draw = False
+
+        if not entity.id == player.id:
+            if "remains" not in entity.name.lower():
+
+                if entity.render_order == RenderOrder.ACTOR:
+                    if game_map.fov[entity.x, entity.y]:
+                        render_status_bar(right_console, 0, list_y, 4, entity.hp, entity.max_hp, colours["light_red"], colours["dark_red"])
+
+                        if mouse_map_x == entity.x and mouse_map_y == entity.y:
+                            right_console.draw_str(5, list_y, entity.name, fg=colours["black"], bg=entity.colour)
+                        else:
+                            right_console.draw_str(5, list_y, entity.name, fg=entity.colour, bg=None)
+                        draw = True
+        if draw:
+            list_y += 1
 
 
 def draw_message_log(message_console, message_log):
@@ -174,6 +211,23 @@ def get_render_char(game_map, x, y):
     # [8    0    16]
     # [32   64  128]
 
+    chars[29] = 186
+    chars[229] = 202
+    chars[221] = 186
+    chars[205] = 200
+    chars[23] = 187
+    chars[99] = 205
+    chars[181] = 185
+    chars[15] = 201
+    chars[13] = 204
+    chars[35] = 203
+    chars[165] = 206
+    chars[247] = 205
+    chars[198] = 205
+    chars[132] = 204
+    chars[116] = 188
+    chars[147] = 187
+    chars[5] = 205
     chars[103] = 205
     chars[199] = 205
     chars[201] = 200
@@ -212,12 +266,12 @@ def get_render_char(game_map, x, y):
     chars[128] = 201
     chars[45] = 204
     chars[196] = 202
-    chars[253] = 202
+    chars[253] = 186
     chars[245] = 202
     chars[97] = 202
     chars[228] = 202
     chars[225] = 202
-    chars[183] = 203
+    chars[183] = 187
     chars[175] = 203
     chars[191] = 186
     chars[134] = 203
@@ -315,8 +369,7 @@ def draw_entities(game_map, map_console, entities):
 
 
 # TODO: Doc
-def update_display(game_map, player, root_console, view_port_console, map_console, message_console, hud_console,
-                   view_port_width, view_port_height, message_log_width, message_log_height, hud_width, hud_height):
+def update_game_display(game_map, player, root_console, view_port_console, map_console, message_console, view_port_width, view_port_height, message_log_width, message_log_height):
 
     view_port_x1, view_port_y1, _, _ = get_view_port_position(player, game_map, view_port_width, view_port_height)
 
@@ -327,8 +380,16 @@ def update_display(game_map, player, root_console, view_port_console, map_consol
     root_console.blit(message_console, 2, 42, width=message_log_width, height=message_log_height)
     message_console.clear()
 
+    tdl.flush()
+
+
+# TODO: Doc
+def update_hud(root_console, hud_console, right_console, hud_width, hud_height, right_con_width, right_con_height):
     root_console.blit(hud_console, 2, 2, width=hud_width, height=hud_height)
     hud_console.clear()
+
+    root_console.blit(right_console, 34, 10, width=right_con_width, height=right_con_height)
+    right_console.clear()
 
     tdl.flush()
 
