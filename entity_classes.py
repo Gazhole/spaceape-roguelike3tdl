@@ -88,12 +88,12 @@ class Actor(Entity):
         damage = attack_power - dodge
 
         if damage > 0:
-            results.append({"message": Message("{} takes {} damage from {}"
-                           .format(target.name, damage, self.name, target.hp), self.colour)})
+            results.append({"message": Message("{} attacks for {} damage"
+                           .format(self.name, damage), self.colour)})
             results.extend(target.take_damage(damage))
 
         else:
-            results.append({"message": Message("{} attacks {} but does no damage".format(self.name, target.name), self.colour)})
+            results.append({"message": Message("{} attacks but does no damage".format(self.name), self.colour)})
 
         return results
 
@@ -106,6 +106,64 @@ class Item(Entity):
     def __init__(self, map_x, map_y, name, char, colour):
         super().__init__(map_x, map_y, name, char, colour)
         self.render_order = RenderOrder.ITEM
+
+
+class Pickup(Item):
+    def __init__(self, map_x, map_y, name, char, colour, stats):
+        super().__init__(map_x, map_y, name, char, colour)
+
+        self.hp = stats.hp
+        self.arm = stats.arm
+        self.mp = stats.mp
+        self.str = stats.str
+        self.dex = stats.dex
+
+    def activate(self, target, entities):
+        results = list()
+        results.append({"message": Message("{} picks up {}".format(target.name, self.name), self.colour)})
+
+        used = False
+
+        if self.hp > 0:
+            if target.hp == target.max_hp:
+                results.append({"message": Message("HP already full!", self.colour)})
+            elif (target.hp + self.hp) > target.max_hp:
+                results.append({"message": Message("{} HP restored.".format(target.max_hp - target.hp), self.colour)})
+                target.hp = target.max_hp
+                used = True
+            else:
+                results.append({"message": Message("{} HP restored.".format(self.hp), self.colour)})
+                target.hp += self.hp
+                used = True
+
+        if self.mp > 0:
+            if target.mp == target.max_mp:
+                results.append({"message": Message("MP already full!", self.colour)})
+            elif (target.mp + self.mp) > target.max_mp:
+                results.append({"message": Message("{} MP restored.".format(target.max_mp - target.mp), self.colour)})
+                target.mp = target.max_mp
+                used = True
+            else:
+                results.append({"message": Message("{} MP restored.".format(self.mp), self.colour)})
+                target.mp += self.mp
+                used = True
+
+        if self.arm > 0:
+            if target.arm == target.max_arm:
+                results.append({"message": Message("AR already full!", self.colour)})
+            elif (target.arm + self.arm) > target.max_arm:
+                results.append({"message": Message("{} AR restored.".format(target.max_arm - target.arm), self.colour)})
+                target.arm = target.max_arm
+                used = True
+            else:
+                results.append({"message": Message("{} AR restored.".format(self.arm), self.colour)})
+                target.arm += self.arm
+                used = True
+
+        if used:
+            entities.remove(self)
+
+        return results
 
 
 class Player(Actor):

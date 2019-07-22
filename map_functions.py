@@ -1,11 +1,11 @@
 from tdl.map import Map
 import numpy as np
 import random
-from entity_classes import Monster
+from entity_classes import Monster, Pickup
 from render_functions import get_render_char
 from entity_classes import stats
 import math
-from entity_templates import monster_manual
+from entity_templates import monster_manual, item_manual
 
 
 # TODO: Features to add
@@ -414,15 +414,22 @@ def place_entity(game_map, entity, entities_list, room=None):
     entities_list.append(entity)
 
 
-def place_entities(game_map, entities_list, max_number_of_entities, room=None):
+def place_monsters(game_map, entities_list, max_number_of_entities, room=None):
     for i in range(PRNG.randint(0, max_number_of_entities)):
         monster_name, monster_char, monster_colour, monster_stats = PRNG.choice(monster_manual["level1"])
         monster = Monster(0, 0, monster_name, monster_char, monster_colour, monster_stats)
         place_entity(game_map, monster, entities_list, room=room)
 
 
+def place_pickups(game_map, entities_list, max_number_of_entities, room=None):
+    for i in range(PRNG.randint(0, max_number_of_entities)):
+        item_name, item_char, item_colour, item_stats = PRNG.choice(item_manual["level1"])
+        item = Pickup(0, 0, item_name, item_char, item_colour, item_stats)
+        place_entity(game_map, item, entities_list, room=room)
+
+
 # TODO: Doc
-def dungeon_generator_complex(game_map, player, entities_list, max_monsters_per_room, num_rooms, cross_link_chance, intersect_chance, map_border=3):
+def dungeon_generator_complex(game_map, player, entities_list, max_monsters_per_room, max_items_per_room, num_rooms, cross_link_chance, intersect_chance, map_border=3):
     boundary_x = (map_border, game_map.width - map_border)
     boundary_y = (map_border, game_map.height - map_border)
 
@@ -431,7 +438,8 @@ def dungeon_generator_complex(game_map, player, entities_list, max_monsters_per_
 
     for i in range(num_rooms - 1):
         room = create_room(game_map, boundary_x, boundary_y, intersect_chance, square=False)
-        place_entities(game_map, entities_list, max_monsters_per_room, room=room)
+        place_monsters(game_map, entities_list, max_monsters_per_room, room=room)
+        place_pickups(game_map, entities_list, max_items_per_room, room=room)
 
     rooms_to_link = list(game_map.rooms)
 
@@ -458,7 +466,8 @@ def dungeon_generator_complex(game_map, player, entities_list, max_monsters_per_
 
     set_doors(game_map)
     remove_junk_doors(game_map, boundary_x, boundary_y)
-    place_entities(game_map, entities_list, max_number_of_entities=num_rooms)
+    place_monsters(game_map, entities_list, max_number_of_entities=num_rooms)
+    place_pickups(game_map, entities_list, max_number_of_entities=num_rooms)
 
     game_map.save_map_to_file(entities_list)
 

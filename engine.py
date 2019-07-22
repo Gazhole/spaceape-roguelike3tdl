@@ -2,7 +2,7 @@ import tdl
 from game_states import GameStates
 from input_functions import handle_keys
 from map_functions import GameMap, Button, dungeon_generator_complex
-from entity_classes import Monster, Player, get_blocking_entities_at_location, stats
+from entity_classes import Monster, Player, Pickup, get_blocking_entities_at_location, stats
 from render_functions import render_all
 from message_functions import MessageLog
 from death_functions import kill_player, kill_monster
@@ -76,7 +76,7 @@ def main():
 
     # Map - create the map object, and then run the function to generate game world.
     game_map = GameMap(map_width, map_height)
-    dungeon_generator_complex(game_map, player, entities, max_monsters_per_room=3, num_rooms=15, intersect_chance=0, cross_link_chance=30)
+    dungeon_generator_complex(game_map, player, entities, max_monsters_per_room=3, max_items_per_room=2, num_rooms=15, intersect_chance=0, cross_link_chance=30)
     # game_map = read_map_from_file("maptest.txt", player, entities)
 
     # # MAIN GAME LOOP
@@ -116,6 +116,7 @@ def main():
         move = action.get('move')
         exit_game = action.get('exit_game')
         fullscreen = action.get('fullscreen')
+        pickup = action.get('pickup')
         '''GET INPUT END'''
 
         '''MENU HANDLING START'''
@@ -128,6 +129,16 @@ def main():
 
         '''PLAYER TURN START'''
         player_turn_results = []
+
+        # Check for items.
+        if pickup and game_state == GameStates.PLAYER_TURN:
+            for entity in entities:
+                if entity.x == player.x and entity.y == player.y:
+                    if isinstance(entity, Pickup):
+                        pickup_results = entity.activate(player, entities)
+                        player_turn_results.extend(pickup_results)
+                        fov_recompute = True
+                        game_state = GameStates.ENEMY_TURN
 
         # If it's a movement event and it's the player's turn, move the player.
         if move and game_state == GameStates.PLAYER_TURN:

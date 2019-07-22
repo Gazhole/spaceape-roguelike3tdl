@@ -20,5 +20,7 @@ def handle_keys(user_input):
 
     if user_input.key == 'ESCAPE':
         return {'exit_game': True}
+    elif key_char == 'g':
+        return {'pickup': True}
 
     return {}
